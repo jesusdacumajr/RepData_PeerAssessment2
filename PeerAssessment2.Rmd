@@ -1,0 +1,112 @@
+---
+title: "Evaluating Consequences of Storm Events"
+author: "Jesus Dacuma"
+date: "October 25, 2015"
+output: html_document
+---
+
+## Synopsis
+
+## Data Processing
+
+```{r, cache=TRUE, warning=FALSE}
+download.file("http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "StormData.csv.bz2")
+stormData <- read.csv("StormData.csv.bz2")
+
+library(dplyr)
+storm.tbl <- tbl_df(stormData)
+```
+
+```{r}
+head(storm.tbl %>% count(EVTYPE, sort = TRUE), 20)
+storm.tbl %>% group_by(EVTYPE) %>% summarize(f = sum(FATALITIES), i = sum(INJURIES)) %>% arrange(desc(f), desc(i))
+
+storm.tbl$EVTYPE[grep("TSTM", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "TSTM WIND"
+storm.tbl$EVTYPE[grep("THUNDER", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "TSTM WIND"
+storm.tbl$EVTYPE[grep("HAIL", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "HAIL"
+storm.tbl$EVTYPE[grep("TORNADO", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "TORNADO"
+storm.tbl$EVTYPE[grep("FLOOD", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "FLOOD"
+storm.tbl$EVTYPE[grep("HIGH WIND", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "HIGH WIND"
+storm.tbl$EVTYPE[grep("SNOW", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "SNOW"
+storm.tbl$EVTYPE[grep("RAIN", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "RAIN"
+storm.tbl$EVTYPE[grep("LIGHTNING", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "LIGHTNING"
+storm.tbl$EVTYPE[grep("WINTER", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "WINTER STORM"
+storm.tbl$EVTYPE[grep("SPOUT", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "WATERSPOUT"
+storm.tbl$EVTYPE[grep("FUNNEL", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "FUNNEL CLOUD"
+storm.tbl$EVTYPE[grep("CLOUD", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "FUNNEL CLOUD"
+storm.tbl$EVTYPE[grep("STRONG WIND", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "STRONG WIND"
+storm.tbl$EVTYPE[grep("URBAN", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "URBAN/SML STREAM FLD"
+storm.tbl$EVTYPE[grep("STREAM", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "URBAN/SML STREAM FLD"
+storm.tbl$EVTYPE[grep("FROST", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "FROST/FREEZE"
+storm.tbl$EVTYPE[grep("FREEZE", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "FROST/FREEZE"
+storm.tbl$EVTYPE[grep("FIRE", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "WILDFIRE"
+storm.tbl$EVTYPE[grep("BLIZZARD", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "BLIZZARD"
+storm.tbl$EVTYPE[grep("MICROBURST", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "MICROBURST"
+storm.tbl$EVTYPE[grep("DROUGHT", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "DROUGHT/EXCESSIVE HEAT"
+storm.tbl$EVTYPE[grep("HEAT", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "DROUGHT/EXCESSIVE HEAT"
+storm.tbl$EVTYPE[grep("DRY", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "DROUGHT/EXCESSIVE HEAT"
+storm.tbl$EVTYPE[grep("WET", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "UNSEASONABLY WET"
+storm.tbl$EVTYPE[grep("COLD", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "EXTREME COLD/WIND CHILL"
+storm.tbl$EVTYPE[grep("CHILL", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "EXTREME COLD/WIND CHILL"
+storm.tbl$EVTYPE[grep("ICE STORM", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "ICE STORM"
+storm.tbl$EVTYPE[grep("FOG", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "DENSE FOG"
+storm.tbl$EVTYPE[grep("SURF", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "RIP CURRENTS/HEAVY SURF"
+storm.tbl$EVTYPE[grep("CURRENT", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "RIP CURRENTS/HEAVY SURF"
+storm.tbl$EVTYPE[grep("HURRICANE", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "HURRICANE"
+storm.tbl$EVTYPE[grep("TROPICAL STORM", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "TROPICAL STORM"
+storm.tbl$EVTYPE[grep("SLIDE", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "MUDSLIDE"
+storm.tbl$EVTYPE[grep("DUST", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "DUST STORM"
+
+cleanRate <- sum(head(storm.tbl %>% count(EVTYPE, sort = TRUE), 25)$n) / nrow(storm.tbl)
+```
+
+```{r}
+unique(storm.tbl$PROPDMGEXP)
+
+storm.tbl$PROPDMGEXP <- tolower(as.character(storm.tbl$PROPDMGEXP))
+
+storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="h"] <- 2
+storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="k"] <- 3
+storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="m"] <- 6
+storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="b"] <- 9
+storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP==""] <- NA
+storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="+"] <- NA
+storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="-"] <- NA
+storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="?"] <- NA
+
+storm.tbl$PROPDMGEXP <- as.numeric(storm.tbl$PROPDMGEXP)
+
+storm.tbl$PROPDMGCOST <- storm.tbl$PROPDMG * 10 ^ storm.tbl$PROPDMGEXP
+
+mean(storm.tbl$PROPDMGCOsT, na.rm = TRUE)
+mean(storm.tbl$PROPDMG)
+storm.tbl$PROPDMGEXP[is.na(storm.tbl$PROPDMGEXP)] <- 4
+
+unique(storm.tbl$CROPDMGEXP)
+
+```
+
+```{r}
+library(tm)
+
+events <- Corpus(VectorSource(storm.tbl$EVTYPE))
+events <- tm_map(events, removePunctuation)
+events <- tm_map(events, stripWhitespace)
+events <- tm_map(events, content_transformer(tolower))
+
+library(wordcloud)
+eventCloud <- wordcloud(events, scale=c(4,.5), min.freq=3, max.words=200, 
+                        random.order=FALSE, colors=brewer.pal(8, 'Dark2'), ordered.colors=FALSE)
+
+library(cluster)
+eventTDM <- TermDocumentMatrix(events)
+eventTDM <- removeSparseTerms(eventTDM, sparse=0.95)
+eventMatrix <- as.matrix(eventTDM)
+eventDist <- dist(scale(eventMatrix))
+eventFit <- hclust(eventDist, method="ward.D2")
+plot(eventFit, cex=0.9, hang=-1)
+rect.hclust(eventFit, k=7)
+eventGroups <- cutree(eventFit, k=10)
+```
+
+## Results
