@@ -82,7 +82,17 @@ mean(storm.tbl$PROPDMGCOsT, na.rm = TRUE)
 mean(storm.tbl$PROPDMG)
 storm.tbl$PROPDMGEXP[is.na(storm.tbl$PROPDMGEXP)] <- 4
 
+stormPropCost <- storm.tbl %>% na.omit() %>% group_by(EVTYPE) %>% summarize(PROPAVGCOST = mean(PROPDMGCOST))
+
 unique(storm.tbl$CROPDMGEXP)
+
+storm.tbl$CROPDMGEXP <- tolower(as.character(storm.tbl$CROPDMGEXP))
+
+storm.tbl$CROPDMGEXP[storm.tbl$CROPDMGEXP=="k"] <- 3
+storm.tbl$CROPDMGEXP[storm.tbl$CROPDMGEXP=="m"] <- 6
+storm.tbl$CROPDMGEXP[storm.tbl$CROPDMGEXP=="b"] <- 9
+storm.tbl$CROPDMGEXP[storm.tbl$CROPDMGEXP==""] <- NA
+storm.tbl$CROPDMGEXP[storm.tbl$CROPDMGEXP=="?"] <- NA
 
 ```
 
