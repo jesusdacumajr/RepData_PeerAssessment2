@@ -9,7 +9,7 @@ output: html_document
 
 ## Data Processing
 
-```{r, cache=TRUE, warning=FALSE}
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
 download.file("http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "StormData.csv.bz2")
 stormData <- read.csv("StormData.csv.bz2")
 
@@ -19,7 +19,6 @@ storm.tbl <- tbl_df(stormData)
 
 ```{r}
 head(storm.tbl %>% count(EVTYPE, sort = TRUE), 20)
-storm.tbl %>% group_by(EVTYPE) %>% summarize(f = sum(FATALITIES), i = sum(INJURIES)) %>% arrange(desc(f), desc(i))
 
 storm.tbl$EVTYPE[grep("TSTM", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "TSTM WIND"
 storm.tbl$EVTYPE[grep("THUNDER", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "TSTM WIND"
@@ -58,10 +57,16 @@ storm.tbl$EVTYPE[grep("SLIDE", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "MUDSLI
 storm.tbl$EVTYPE[grep("DUST", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "DUST STORM"
 
 cleanRate <- sum(head(storm.tbl %>% count(EVTYPE, sort = TRUE), 25)$n) / nrow(storm.tbl)
+
+storm.tbl %>% group_by(EVTYPE) %>% 
+    summarize(fs = sum(FATALITIES), is = sum(INJURIES), fm = mean(FATALITIES), im = mean(INJURIES)) %>% 
+    arrange(desc(fs), desc(is), desc(fm), desc(im))
 ```
 
 ```{r}
 unique(storm.tbl$PROPDMGEXP)
+
+storm.tbl$PROPDMGEXP[storm.tbl$PROPDMG==0] <- 0
 
 storm.tbl$PROPDMGEXP <- tolower(as.character(storm.tbl$PROPDMGEXP))
 
@@ -72,19 +77,22 @@ storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="b"] <- 9
 storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP==""] <- NA
 storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="+"] <- NA
 storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="-"] <- NA
-storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="?"] <- NA
 
 storm.tbl$PROPDMGEXP <- as.numeric(storm.tbl$PROPDMGEXP)
 
 storm.tbl$PROPDMGCOST <- storm.tbl$PROPDMG * 10 ^ storm.tbl$PROPDMGEXP
 
-mean(storm.tbl$PROPDMGCOsT, na.rm = TRUE)
-mean(storm.tbl$PROPDMG)
-storm.tbl$PROPDMGEXP[is.na(storm.tbl$PROPDMGEXP)] <- 4
+nrow(storm.tbl[!is.na(storm.tbl$PROPDMGCOST),])
 
-stormPropCost <- storm.tbl %>% na.omit() %>% group_by(EVTYPE) %>% summarize(PROPAVGCOST = mean(PROPDMGCOST))
+stormPropCost <- storm.tbl %>% filter(!is.na(PROPDMGCOST)) %>% 
+    group_by(EVTYPE) %>% summarize(PROPAVGCOST = mean(PROPDMGCOST)) %>%
+    arrange(desc(PROPAVGCOST))
+```
 
+```{r}
 unique(storm.tbl$CROPDMGEXP)
+
+storm.tbl$CROPDMGEXP[storm.tbl$CROPDMG==0] <- 0
 
 storm.tbl$CROPDMGEXP <- tolower(as.character(storm.tbl$CROPDMGEXP))
 
@@ -92,31 +100,16 @@ storm.tbl$CROPDMGEXP[storm.tbl$CROPDMGEXP=="k"] <- 3
 storm.tbl$CROPDMGEXP[storm.tbl$CROPDMGEXP=="m"] <- 6
 storm.tbl$CROPDMGEXP[storm.tbl$CROPDMGEXP=="b"] <- 9
 storm.tbl$CROPDMGEXP[storm.tbl$CROPDMGEXP==""] <- NA
-storm.tbl$CROPDMGEXP[storm.tbl$CROPDMGEXP=="?"] <- NA
 
-```
+storm.tbl$CROPDMGEXP <- as.numeric(storm.tbl$CROPDMGEXP)
 
-```{r}
-library(tm)
+storm.tbl$CROPDMGCOST <- storm.tbl$CROPDMG * 10 ^ storm.tbl$CROPDMGEXP
 
-events <- Corpus(VectorSource(storm.tbl$EVTYPE))
-events <- tm_map(events, removePunctuation)
-events <- tm_map(events, stripWhitespace)
-events <- tm_map(events, content_transformer(tolower))
+nrow(storm.tbl[!is.na(storm.tbl$CROPDMGCOST),])
 
-library(wordcloud)
-eventCloud <- wordcloud(events, scale=c(4,.5), min.freq=3, max.words=200, 
-                        random.order=FALSE, colors=brewer.pal(8, 'Dark2'), ordered.colors=FALSE)
-
-library(cluster)
-eventTDM <- TermDocumentMatrix(events)
-eventTDM <- removeSparseTerms(eventTDM, sparse=0.95)
-eventMatrix <- as.matrix(eventTDM)
-eventDist <- dist(scale(eventMatrix))
-eventFit <- hclust(eventDist, method="ward.D2")
-plot(eventFit, cex=0.9, hang=-1)
-rect.hclust(eventFit, k=7)
-eventGroups <- cutree(eventFit, k=10)
+stormCropCost <- storm.tbl %>% filter(!is.na(CROPDMGCOST)) %>% 
+    group_by(EVTYPE) %>% summarize(CROPAVGCOST = mean(CROPDMGCOST)) %>% 
+    arrange(desc(CROPAVGCOST))
 ```
 
 ## Results
