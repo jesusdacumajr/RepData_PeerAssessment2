@@ -17,9 +17,9 @@ library(dplyr)
 storm.tbl <- tbl_df(stormData)
 ```
 
-```{r}
-head(storm.tbl %>% count(EVTYPE, sort = TRUE), 20)
+`unique(storm.tbl$PROPDMGEXP)`
 
+```{r}
 storm.tbl$EVTYPE[grep("TSTM", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "TSTM WIND"
 storm.tbl$EVTYPE[grep("THUNDER", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "TSTM WIND"
 storm.tbl$EVTYPE[grep("HAIL", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "HAIL"
@@ -54,22 +54,25 @@ storm.tbl$EVTYPE[grep("CURRENT", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "RIP 
 storm.tbl$EVTYPE[grep("HURRICANE", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "HURRICANE"
 storm.tbl$EVTYPE[grep("TROPICAL STORM", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "TROPICAL STORM"
 storm.tbl$EVTYPE[grep("SLIDE", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "MUDSLIDE"
+storm.tbl$EVTYPE[grep("SLUMP", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "LANDSLUMP"
 storm.tbl$EVTYPE[grep("DUST", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "DUST STORM"
+storm.tbl$EVTYPE[grep("AVALANC", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "AVALANCHE"
+storm.tbl$EVTYPE[grep("SURGE", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "STORM SURGE/TIDE"
+storm.tbl$EVTYPE[grep("WAVE", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "ROGUE WAVE"
+storm.tbl$EVTYPE[grep("EROS", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "BEACH EROSION"
 
 cleanRate <- sum(head(storm.tbl %>% count(EVTYPE, sort = TRUE), 25)$n) / nrow(storm.tbl)
-
-storm.tbl %>% group_by(EVTYPE) %>% 
-    summarize(fs = sum(FATALITIES), is = sum(INJURIES), fm = mean(FATALITIES), im = mean(INJURIES)) %>% 
-    arrange(desc(fs), desc(is), desc(fm), desc(im))
+head(storm.tbl %>% count(EVTYPE, sort = TRUE), 20)
 ```
 
-```{r}
-unique(storm.tbl$PROPDMGEXP)
+`unique(storm.tbl$PROPDMGEXP)`
 
+```{r}
+# All events with $0 in damages have magnitude of zero
 storm.tbl$PROPDMGEXP[storm.tbl$PROPDMG==0] <- 0
 
+# Change magnitudes from alphabetical to numeric
 storm.tbl$PROPDMGEXP <- tolower(as.character(storm.tbl$PROPDMGEXP))
-
 storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="h"] <- 2
 storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="k"] <- 3
 storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="m"] <- 6
@@ -77,39 +80,89 @@ storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="b"] <- 9
 storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP==""] <- NA
 storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="+"] <- NA
 storm.tbl$PROPDMGEXP[storm.tbl$PROPDMGEXP=="-"] <- NA
-
 storm.tbl$PROPDMGEXP <- as.numeric(storm.tbl$PROPDMGEXP)
 
+# Calculate property damage costs
 storm.tbl$PROPDMGCOST <- storm.tbl$PROPDMG * 10 ^ storm.tbl$PROPDMGEXP
 
 nrow(storm.tbl[!is.na(storm.tbl$PROPDMGCOST),])
-
-stormPropCost <- storm.tbl %>% filter(!is.na(PROPDMGCOST)) %>% 
-    group_by(EVTYPE) %>% summarize(PROPAVGCOST = mean(PROPDMGCOST)) %>%
-    arrange(desc(PROPAVGCOST))
 ```
 
-```{r}
-unique(storm.tbl$CROPDMGEXP)
+`unique(storm.tbl$CROPDMGEXP)`
 
+```{r}
+# All events with $0 in damages have magnitude of zero
 storm.tbl$CROPDMGEXP[storm.tbl$CROPDMG==0] <- 0
 
+# Change magnitudes from alphabetical to numeric
 storm.tbl$CROPDMGEXP <- tolower(as.character(storm.tbl$CROPDMGEXP))
-
 storm.tbl$CROPDMGEXP[storm.tbl$CROPDMGEXP=="k"] <- 3
 storm.tbl$CROPDMGEXP[storm.tbl$CROPDMGEXP=="m"] <- 6
 storm.tbl$CROPDMGEXP[storm.tbl$CROPDMGEXP=="b"] <- 9
 storm.tbl$CROPDMGEXP[storm.tbl$CROPDMGEXP==""] <- NA
-
 storm.tbl$CROPDMGEXP <- as.numeric(storm.tbl$CROPDMGEXP)
 
+# Calculate agricultural damage costs
 storm.tbl$CROPDMGCOST <- storm.tbl$CROPDMG * 10 ^ storm.tbl$CROPDMGEXP
 
 nrow(storm.tbl[!is.na(storm.tbl$CROPDMGCOST),])
+```
+
+## Results
+
+```{r}
+# Calculate total deaths/injuries
+popHealthTot <- storm.tbl %>% group_by(EVTYPE) %>% 
+    summarize(Deaths = sum(FATALITIES), Injuries = sum(INJURIES)) %>% 
+    arrange(desc(Deaths), desc(Injuries))
+```
+
+```{r, warning=FALSE, message=FALSE}
+library(reshape2)
+popMelt <- melt(head(popHealthTot, 5), "EVTYPE")
+
+library(ggplot2)
+g1 <- ggplot(data=popMelt, aes(x=EVTYPE, y=value, fill=variable)) +
+    geom_bar(stat="identity", position=position_dodge()) +
+    labs(title = "Deaths and Injuries from Weather Events",
+         x = "Event Type", y = "Total Death/Injuries (since 1955)") +
+    scale_fill_discrete(name="Hazard Type")
+```
+
+```{r}
+stormPropCost <- storm.tbl %>% filter(!is.na(PROPDMGCOST)) %>% 
+    group_by(EVTYPE) %>% summarize(PROPAVGCOST = mean(PROPDMGCOST)) %>%
+    arrange(desc(PROPAVGCOST))
 
 stormCropCost <- storm.tbl %>% filter(!is.na(CROPDMGCOST)) %>% 
     group_by(EVTYPE) %>% summarize(CROPAVGCOST = mean(CROPDMGCOST)) %>% 
     arrange(desc(CROPAVGCOST))
+
+stormTotCost <- stormPropCost %>% inner_join(stormCropCost, by = "EVTYPE") %>%
+    mutate(TOTAVGCOST = PROPAVGCOST + CROPAVGCOST) %>% 
+    arrange(desc(TOTAVGCOST))
 ```
 
-## Results
+```{r, warning=FALSE, message=FALSE}
+p1 <- ggplot(data = head(stormPropCost, 5), aes(x=EVTYPE, y=PROPAVGCOST, fill=EVTYPE)) + 
+    geom_bar(stat = "identity") + guides(fill=FALSE) + 
+    labs(title = "Property Damages from Weather Events",
+         x = "Event Type", y = "Cost of Damages (in US Dollars)")
+
+p2 <- ggplot(data = head(stormCropCost, 5), aes(x=EVTYPE, y=CROPAVGCOST, fill=EVTYPE)) + 
+    geom_bar(stat = "identity") + guides(fill=FALSE) + 
+    labs(title = "Agricultural Damages from Weather Events",
+         x = "Event Type", y = "Cost of Damages (in US Dollars)")
+
+library(grid)
+library(gridExtra)
+g2 <- grid.arrange(p1, p2, ncol=2)
+```
+
+```{r}
+stormCostMelt <- melt(head(stormTotCost[,1:3], 3), "EVTYPE")
+
+g3 <- ggplot(data=head(stormTotCost, 5), aes(x=EVTYPE, y=TOTAVGCOST, fill=EVTYPE)) +
+    geom_bar(stat = "identity") + guides(fill=FALSE) +
+    labs(title = "Economical Consequences of Weather Events",
+         x = "Storm Type", y = "Total Cost of Damages (in US Dollars)")
