@@ -8,7 +8,7 @@ output: html_document
 ## Synopsis
 
 ## Data Processing
-
+Storm data can be donwloaded from the NOAA Storm Database. The `dplyr` library is used to convert the data frame to a tbl_df.
 ```{r, cache=TRUE, warning=FALSE, message=FALSE}
 download.file("http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "StormData.csv.bz2")
 stormData <- read.csv("StormData.csv.bz2")
@@ -17,9 +17,16 @@ library(dplyr)
 storm.tbl <- tbl_df(stormData)
 ```
 
-`unique(storm.tbl$PROPDMGEXP)`
+The loaded dataset contains `r nrow(storm.tbl)` rows, and since the data contains events since 1955, there are many inconsistencies with the entries. To correctly evaluate the consequences of weather events, the first step is to clean up the dataset. 
+
+### Cleaning Event Types (EVTYPE)
+
+The raw data contains more than 900 levels of events, but many of these are the same and just vary in terminology (FROST vs. FREEZE), abbreviations (TSTM vs. THUNDERSTORM), case (RAIN vs. Rain), typos and other.
+
+The process used to clean the data set was dynamic that involved looking at the most common event types (`head(storm.tbl %>% count(EVTYPE, sort = TRUE), 20)`) and searching for similar event names using regular expressions (`unique(storm.tbl$EVTYPE[grep("event", storm.tbl$EVTYPE, ignore.case = TRUE)])`). 
 
 ```{r}
+# Combine similar names of event types
 storm.tbl$EVTYPE[grep("TSTM", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "TSTM WIND"
 storm.tbl$EVTYPE[grep("THUNDER", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "TSTM WIND"
 storm.tbl$EVTYPE[grep("HAIL", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "HAIL"
@@ -60,12 +67,24 @@ storm.tbl$EVTYPE[grep("AVALANC", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "AVAL
 storm.tbl$EVTYPE[grep("SURGE", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "STORM SURGE/TIDE"
 storm.tbl$EVTYPE[grep("WAVE", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "ROGUE WAVE"
 storm.tbl$EVTYPE[grep("EROS", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "BEACH EROSION"
+```
 
+The above code does not clean the entire dataset. However, the goal was to clean enough of the dataset to make a representative portion reliable.
+
+```{r}
+# Calculate percentage of cleaned rows
 cleanRate <- sum(head(storm.tbl %>% count(EVTYPE, sort = TRUE), 25)$n) / nrow(storm.tbl)
+
 head(storm.tbl %>% count(EVTYPE, sort = TRUE), 20)
 ```
 
-`unique(storm.tbl$PROPDMGEXP)`
+At least the top 25 most common events were categorized correctly, so at the very least, `r round(cleanRate*100, digits = 2)` percent of the dataset has a correct event type.
+
+### Cleaning Magnitudes of Property and Agricultural Damages (PROPDMGEXP and CROPDMGEXP)
+
+Cost of damages was unconventionally recorded in the dataset. The damage is recorded as a value (`PROPDMG` and `CROPDMG`) with a magnitude multiplier (`PROPDMGEXP` and `CROPDMGEXP`). While each event had a double stored as a value of damage cost, the magitudes were inconsistent, varying from alphabetical (K, M, B), to numeric (4, 5, 6, etc.), to symbolic (+, -, ?) to missing. 
+
+The magnitudes were standardized as numerical powers of 10, and a singular value for each event was calculated and stored in the dataset.
 
 ```{r}
 # All events with $0 in damages have magnitude of zero
@@ -85,10 +104,12 @@ storm.tbl$PROPDMGEXP <- as.numeric(storm.tbl$PROPDMGEXP)
 # Calculate property damage costs
 storm.tbl$PROPDMGCOST <- storm.tbl$PROPDMG * 10 ^ storm.tbl$PROPDMGEXP
 
-nrow(storm.tbl[!is.na(storm.tbl$PROPDMGCOST),])
+missingProp <- nrow(storm.tbl[is.na(storm.tbl$PROPDMGCOST),])
 ```
 
-`unique(storm.tbl$CROPDMGEXP)`
+Much of the inconsistencies were solved as the some events did not have an monetary impact (`PROPDMG = 0`), and processing the data only left `r missingProp` rows with missing data on property damages. With a large dataset of `r nrow(storm.tbl)` rows, the missing rows leave minimal impact.
+
+Data for agricultural damages was cleaned in similar fashion. 
 
 ```{r}
 # All events with $0 in damages have magnitude of zero
@@ -105,8 +126,10 @@ storm.tbl$CROPDMGEXP <- as.numeric(storm.tbl$CROPDMGEXP)
 # Calculate agricultural damage costs
 storm.tbl$CROPDMGCOST <- storm.tbl$CROPDMG * 10 ^ storm.tbl$CROPDMGEXP
 
-nrow(storm.tbl[!is.na(storm.tbl$CROPDMGCOST),])
+missingCrop <- nrow(storm.tbl[is.na(storm.tbl$CROPDMGCOST),])
 ```
+
+Again, only `r missingCrop` rows had missing values, which is an insignificant amount. Any rows with missing damage values can be omitted from analysis.
 
 ## Results
 
