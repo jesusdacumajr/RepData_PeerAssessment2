@@ -1,11 +1,6 @@
----
-title: "Evaluating Consequences of Storm Events"
-author: "Jesus Dacuma"
-date: "October 25, 2015"
-output: 
-  html_document:
-    keep_md: true
----
+# Evaluating Consequences of Storm Events
+Jesus Dacuma  
+October 25, 2015  
 
 ## Synopsis
 
@@ -13,19 +8,21 @@ Weather data from the NOAA Storm Database was analyzed for overall effects to th
 
 ## Data Processing
 Storm data can be downloaded from the NOAA Storm Database. The `dplyr` library is used to convert the data frame to a tbl_df.
-```{r, cache=TRUE, warning=FALSE, message=FALSE}
+
+```r
 download.file("http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", 
               "StormData.csv.bz2",
               method = "curl")
 stormData <- read.csv("StormData.csv.bz2")
 ```
 
-```{r}
+
+```r
 library(dplyr)
 storm.tbl <- tbl_df(stormData)
 ```
 
-The loaded dataset contains `r nrow(storm.tbl)` rows, and since the data contains events since 1955, there are many inconsistencies with the entries. To correctly evaluate the consequences of weather events, the first step is to clean up the dataset. 
+The loaded dataset contains 902297 rows, and since the data contains events since 1955, there are many inconsistencies with the entries. To correctly evaluate the consequences of weather events, the first step is to clean up the dataset. 
 
 ### Cleaning Event Types (EVTYPE)
 
@@ -33,7 +30,8 @@ The raw data contains more than 900 levels of events, but many of these are the 
 
 The process used to clean the data set was dynamic that involved looking at the most common event types (`head(storm.tbl %>% count(EVTYPE, sort = TRUE), 20)`) and searching for similar event names using regular expressions (`unique(storm.tbl$EVTYPE[grep("event", storm.tbl$EVTYPE, ignore.case = TRUE)])`). 
 
-```{r}
+
+```r
 # Combine similar names of event types
 storm.tbl$EVTYPE[grep("TSTM", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "TSTM WIND"
 storm.tbl$EVTYPE[grep("THUNDER", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "TSTM WIND"
@@ -79,14 +77,41 @@ storm.tbl$EVTYPE[grep("EROS", storm.tbl$EVTYPE, ignore.case = TRUE)] <- "BEACH E
 
 The above code does not clean the entire dataset. However, the goal was to clean enough of the dataset to make a representative portion reliable.
 
-```{r}
+
+```r
 # Calculate percentage of cleaned rows
 cleanRate <- sum(head(storm.tbl %>% count(EVTYPE, sort = TRUE), 25)$n) / nrow(storm.tbl)
 
 head(storm.tbl %>% count(EVTYPE, sort = TRUE), 20)
 ```
 
-At least the top 25 most common events were categorized correctly, so at the very least, `r round(cleanRate*100, digits = 2)` percent of the dataset has a correct event type.
+```
+## Source: local data frame [20 x 2]
+## 
+##                     EVTYPE      n
+## 1                TSTM WIND 336818
+## 2                     HAIL 289283
+## 3                    FLOOD  82724
+## 4                  TORNADO  60699
+## 5                HIGH WIND  21950
+## 6             WINTER STORM  19597
+## 7                     SNOW  17682
+## 8                LIGHTNING  15761
+## 9                     RAIN  12165
+## 10            FUNNEL CLOUD   6997
+## 11  DROUGHT/EXCESSIVE HEAT   5246
+## 12                WILDFIRE   4239
+## 13              WATERSPOUT   3851
+## 14             STRONG WIND   3824
+## 15    URBAN/SML STREAM FLD   3414
+## 16                BLIZZARD   2726
+## 17 EXTREME COLD/WIND CHILL   2685
+## 18               ICE STORM   2008
+## 19               DENSE FOG   1882
+## 20 RIP CURRENTS/HEAVY SURF   1838
+```
+
+At least the top 25 most common events were categorized correctly, so at the very least, 99.66 percent of the dataset has a correct event type.
 
 ### Cleaning Magnitudes of Property and Agricultural Damages (PROPDMGEXP and CROPDMGEXP)
 
@@ -94,7 +119,8 @@ Cost of damages was unconventionally recorded in the dataset. The damage is reco
 
 The magnitudes were standardized as numerical powers of 10, and a singular value for each event was calculated and stored in the dataset.
 
-```{r}
+
+```r
 # All events with $0 in damages have magnitude of zero
 storm.tbl$PROPDMGEXP[storm.tbl$PROPDMG==0] <- 0
 
@@ -115,11 +141,12 @@ storm.tbl$PROPDMGCOST <- storm.tbl$PROPDMG * 10 ^ storm.tbl$PROPDMGEXP
 missingProp <- nrow(storm.tbl[is.na(storm.tbl$PROPDMGCOST),])
 ```
 
-Much of the inconsistencies were solved as the some events did not have an monetary impact (`PROPDMG = 0`), and processing the data only left `r missingProp` rows with missing data on property damages. With a large dataset of `r nrow(storm.tbl)` rows, the missing rows leave minimal impact.
+Much of the inconsistencies were solved as the some events did not have an monetary impact (`PROPDMG = 0`), and processing the data only left 82 rows with missing data on property damages. With a large dataset of 902297 rows, the missing rows leave minimal impact.
 
 Data for agricultural damages was cleaned in similar fashion. 
 
-```{r}
+
+```r
 # All events with $0 in damages have magnitude of zero
 storm.tbl$CROPDMGEXP[storm.tbl$CROPDMG==0] <- 0
 
@@ -137,7 +164,7 @@ storm.tbl$CROPDMGCOST <- storm.tbl$CROPDMG * 10 ^ storm.tbl$CROPDMGEXP
 missingCrop <- nrow(storm.tbl[is.na(storm.tbl$CROPDMGCOST),])
 ```
 
-Again, only `r missingCrop` rows had missing values, which is an insignificant amount. Any rows with missing damage values can be omitted from analysis.
+Again, only 3 rows had missing values, which is an insignificant amount. Any rows with missing damage values can be omitted from analysis.
 
 ## Results
 
@@ -145,7 +172,8 @@ Again, only `r missingCrop` rows had missing values, which is an insignificant a
 
 For analysis of population health effects from each event, the total number of deaths and injuries was calculated for each type of weather event. The data arranged in descending order of deaths; however, it is interesting to note that the weather events with the five highest death totals also have the five highest injury totals (although not in the same order).
 
-```{r}
+
+```r
 # Calculate total deaths/injuries
 popHealthTot <- storm.tbl %>% group_by(EVTYPE) %>% 
     summarize(Deaths = sum(FATALITIES), Injuries = sum(INJURIES)) %>% 
@@ -154,11 +182,29 @@ popHealthTot <- storm.tbl %>% group_by(EVTYPE) %>%
 popHealthTot
 ```
 
+```
+## Source: local data frame [263 x 3]
+## 
+##                     EVTYPE Deaths Injuries
+## 1                  TORNADO   5636    91407
+## 2   DROUGHT/EXCESSIVE HEAT   3167     9229
+## 3                    FLOOD   1525     8604
+## 4                LIGHTNING    817     5231
+## 5                TSTM WIND    756     9545
+## 6  RIP CURRENTS/HEAVY SURF    738      775
+## 7  EXTREME COLD/WIND CHILL    453      321
+## 8                HIGH WIND    299     1523
+## 9             WINTER STORM    277     1876
+## 10               AVALANCHE    225      170
+## ..                     ...    ...      ...
+```
+
 The weather events most hazardous to population health are shown above, and the top five include tornadoes, droughts and excessive heat, floods, lightning, and thunderstorm wind.
 
 The plot below shows a visual comparison of the effects from the five most hazardous weather events. Tornadoes rank highest in both deaths and injuries since 1955, and the amount of injuries caused by tornadoes dwarfs the number injuries from any other event.
 
-```{r, warning=FALSE, message=FALSE}
+
+```r
 library(reshape2)
 popMelt <- melt(head(popHealthTot, 5), "EVTYPE")
 
@@ -172,19 +218,41 @@ g1 <- ggplot(data=popMelt, aes(x=EVTYPE, y=value, fill=variable)) +
 g1
 ```
 
+![](PeerAssessment2_files/figure-html/unnamed-chunk-8-1.png) 
+
 ### Economic Effects
 
 Financial consequences can differ according to the type of event. Changes in temperature from droughts or extreme cold can damage crops, while other events of a more physical nature such as tornadoes and mudslides can damage property. Some events have are so extreme, they have the ability to do both (storms, floods, wildfires).
 
 Damages to property and agriculture were calculated separately, as mitigating the effects of these damages can differ. Events were ranked according to the average cost in damages, so one can use the results to estimate how much money a specific event may cost.
 
-```{r}
+
+```r
 stormPropCost <- storm.tbl %>% filter(!is.na(PROPDMGCOST)) %>% 
     group_by(EVTYPE) %>% summarize(PROPAVGCOST = mean(PROPDMGCOST)) %>%
     arrange(desc(PROPAVGCOST))
 
 stormPropCost
+```
 
+```
+## Source: local data frame [263 x 2]
+## 
+##              EVTYPE PROPAVGCOST
+## 1         HURRICANE 294969268.3
+## 2  STORM SURGE/TIDE 116703708.0
+## 3           TYPHOON  54566363.6
+## 4    TROPICAL STORM  11067992.2
+## 5           TSUNAMI   7203100.0
+## 6             FLOOD   2034072.5
+## 7          WILDFIRE   2004394.6
+## 8         ICE STORM   1964854.5
+## 9           TORNADO    939145.6
+## 10         MUDSLIDE    505922.8
+## ..              ...         ...
+```
+
+```r
 g2 <- ggplot(data = head(stormPropCost, 5), aes(x=EVTYPE, y=PROPAVGCOST, fill=EVTYPE)) + 
     geom_bar(stat = "identity") + guides(fill=FALSE) + 
     labs(title = "Property Damages from Weather Events",
@@ -193,22 +261,42 @@ g2 <- ggplot(data = head(stormPropCost, 5), aes(x=EVTYPE, y=PROPAVGCOST, fill=EV
 g2
 ```
 
+![](PeerAssessment2_files/figure-html/unnamed-chunk-9-1.png) 
+
 The events costing the most money in property damages are hurricanes, storm surges, typhoons, tropical storms and tsunamis. Hurricanes and storm surges are especially damaging, as they are the only events to cause over 100 million dollars in property damages, with hurricanes causing just under 300 million dollars in damages.
 
 One thing to note is that the five most costly weather events really break down into two categories: major storms (hurricanes, typhoons and tropical storms) and immense coastal waves (storm surges and tsunamis). For the purposes of city planning, one can plan similarly for these types of events.
 
-```{r}
+
+```r
 stormCropCost <- storm.tbl %>% filter(!is.na(CROPDMGCOST)) %>% 
     group_by(EVTYPE) %>% summarize(CROPAVGCOST = mean(CROPDMGCOST)) %>% 
     arrange(desc(CROPAVGCOST))
 
 stormCropCost
+```
 
+```
+## Source: local data frame [263 x 2]
+## 
+##                     EVTYPE CROPAVGCOST
+## 1                HURRICANE 19182204.88
+## 2         UNSEASONABLY WET  5461538.46
+## 3   DROUGHT/EXCESSIVE HEAT  2835881.68
+## 4                ICE STORM  2501052.54
+## 5             FROST/FREEZE  1320807.54
+## 6           TROPICAL STORM   996981.35
+## 7  EXTREME COLD/WIND CHILL   506802.79
+## 8                    FLOOD   149655.23
+## 9                 WILDFIRE    95136.03
+## 10                 TYPHOON    75000.00
+## ..                     ...         ...
 ```
 
 The events costing the most money in agricultural damage are hurricanes, unseasonable wetness, droughts and excessive heat, and frost. Hurricanes cause approximately 19 million dollars in damages to crops, while the other four are in the range of one to five million dollars.
 
-```{r, warning=FALSE, message=FALSE}
+
+```r
 g3 <- ggplot(data = head(stormCropCost, 5), aes(x=EVTYPE, y=CROPAVGCOST, fill=EVTYPE)) + 
     geom_bar(stat = "identity") + guides(fill=FALSE) + 
     labs(title = "Agricultural Damages from Weather Events",
@@ -217,16 +305,36 @@ g3 <- ggplot(data = head(stormCropCost, 5), aes(x=EVTYPE, y=CROPAVGCOST, fill=EV
 g3
 ```
 
+![](PeerAssessment2_files/figure-html/unnamed-chunk-11-1.png) 
+
 The table below shows the total costs from both property and agricultural damage. However, the total cost is very heavily influenced by property damages.
 
 Hurricanes cause the most in damages as it was the only event to rank in the top five in both property and agricultural damage.
 
-```{r}
+
+```r
 stormTotCost <- stormPropCost %>% inner_join(stormCropCost, by = "EVTYPE") %>%
     mutate(TOTAVGCOST = PROPAVGCOST + CROPAVGCOST) %>% 
     arrange(desc(TOTAVGCOST))
 
 stormTotCost
+```
+
+```
+## Source: local data frame [263 x 4]
+## 
+##                    EVTYPE PROPAVGCOST  CROPAVGCOST TOTAVGCOST
+## 1               HURRICANE 294969268.3 19182204.878  314151473
+## 2        STORM SURGE/TIDE 116703708.0     2080.292  116705788
+## 3                 TYPHOON  54566363.6    75000.000   54641364
+## 4          TROPICAL STORM  11067992.2   996981.349   12064974
+## 5                 TSUNAMI   7203100.0     1000.000    7204100
+## 6        UNSEASONABLY WET         0.0  5461538.462    5461538
+## 7               ICE STORM   1964854.5  2501052.540    4465907
+## 8  DROUGHT/EXCESSIVE HEAT    203284.7  2835881.677    3039166
+## 9                   FLOOD   2034072.5   149655.228    2183728
+## 10               WILDFIRE   2004394.6    95136.030    2099531
+## ..                    ...         ...          ...        ...
 ```
 
 ## Conclusion
